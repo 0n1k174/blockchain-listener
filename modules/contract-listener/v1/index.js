@@ -117,8 +117,9 @@ async function getBalance(settings) {
     await Connection.db.collection(collectionName).find(query).project({_id: 0, block: 0, hash: 0}).forEach(event => {
         console.log(event)
         if (event.value) {
+            const isSender = event.sender.toLowerCase() === settings.address.toLowerCase()
             const value = Number(event.value) / Math.pow(10, decimals)
-            balance += value;
+            balance += (isSender ? -value : value);
         }
     })
 
