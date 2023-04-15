@@ -46,7 +46,7 @@ async function getTransactions(settings) {
     }
 
     const limit = settings.limit;
-    const skip = settings.skip;
+    let skip = settings.skip;
 
     let transactions = {};
     const eventsCursor = Connection.db.collection(collectionName).find(query).project({_id: 0}).sort({block: -1})
@@ -57,15 +57,15 @@ async function getTransactions(settings) {
             break;
         }
 
-
         if (!transactions[event.hash]) {
+
+            if (Number.isFinite(skip) && Object.keys(transactions).length === skip) {
+                transactions = {};
+                skip = null;
+            }
 
             if (limit && Object.keys(transactions).length === limit) {
                 break;
-            }
-
-            if (skip && Object.keys(transactions).length === skip) {
-                transactions = {};
             }
 
             transactions[event.hash] = {
@@ -95,12 +95,11 @@ async function getBalance(settings) {
     const collectionName = ContractCache.checkTransactionsCollection(settings.contractAddress)
     if (!collectionName) {
         throw Error('Contract history is not supported')
-    }// if settings.real -> get from blockchain
+    }
 
     if (settings.real) {
         return Web3API.getBalance(settings.contractAddress, settings.address)
     }
-
 
     const query = {
         event: "Transfer",
@@ -115,8 +114,7 @@ async function getBalance(settings) {
     // info: it's always better that the job updates realtime balances on another table but as written in task, will just sum here and return
     let balance = 0;
     await Connection.db.collection(collectionName).find(query).project({_id: 0, block: 0, hash: 0}).forEach(event => {
-        console.log(event)
-        if (event.value) {
+        if (event.sender && event.value) {
             const isSender = event.sender.toLowerCase() === settings.address.toLowerCase()
             const value = Number(event.value) / Math.pow(10, decimals)
             balance += (isSender ? -value : value);
